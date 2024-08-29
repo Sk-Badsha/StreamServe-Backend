@@ -1,15 +1,22 @@
-import express from "express";
+import dotenv from "dotenv";
+import connectDB from "./db/dbconnect_promise.js";
 
-const app = express();
-
-app.get("/", (req, res) => {
-  res.send("Hello World");
+dotenv.config({
+  path: "./env",
 });
 
-app.get("/about", (req, res) => {
-  res.send("about is working");
-});
+connectDB();
 
-app.listen(4000, () => {
-  console.log("app is listening on port number 4000");
-});
+/*
+(async () => {
+  try {
+    await mongoose
+      .connect(`${process.env.MONGODB_URL}/${DB_NAME}`)
+      .then(() => {});
+  } catch (error) {
+    console.log("Error: ", err);
+    throw err;
+  }
+})();
+
+*/
