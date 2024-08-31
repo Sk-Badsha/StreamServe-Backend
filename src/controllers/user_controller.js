@@ -82,9 +82,9 @@ const loginUser = asyncHandler(async (req, res) => {
 
   if (!user) throw new ApiError(404, "user doesn't exist");
 
-  const isPasswordCorrect = await user.isPasswordCorrect(password);
+  const isPasswordValid = await user.isPasswordCorrect(password);
 
-  if (!isPasswordCorrect) throw new ApiError(401, "Invalid user credentials");
+  if (!isPasswordValid) throw new ApiError(401, "Invalid user credentials");
 
   const { acc_token, ref_token } = await generateAccessAndRefreshToken(
     user._id
@@ -116,15 +116,42 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 });
 
+const logoutUser = asyncHandler(async (req, res) => {
+  await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined, // this removes the field from document
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logged Out"));
+});
+
 const generateAccessAndRefreshToken = async (userId) => {
   try {
-  } catch (error) {
     const user = await User.findById(userId);
     const acc_token = user.generateAccessToken();
     const ref_token = user.generateRefreshToken();
-    user.refreshToken = refreshToken;
+
+    user.refreshToken = ref_token;
+
     await user.save({ validateBeforeSave: false });
     return { acc_token, ref_token };
+  } catch (error) {
     throw new ApiError(
       500,
       "Something went wrong while generating access token"
@@ -132,4 +159,4 @@ const generateAccessAndRefreshToken = async (userId) => {
   }
 };
 
-export { registerUser, loginUser };
+export { registerUser, loginUser, logoutUser };
