@@ -6,6 +6,11 @@ const connectDB = async () => {
     const connectionInstance = await mongoose.connect(
       `${process.env.MONGODB_URL}/${DB_NAME}`
     );
+
+    // this is for connecting to nosqlbooster for mongoDB interface
+    // const connectionInstance = await mongoose.connect(
+    //   `${process.env.MONGODB_URL}`
+    // );
     console.log(
       `\n MongoDB Connected Successfully!!  DB_HOST ${connectionInstance.connection.host}`
     );

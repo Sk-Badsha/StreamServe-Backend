@@ -1,4 +1,4 @@
-import cloudinary from "cloudinary";
+import { v2 as cloudinary } from "cloudinary";
 // to read write or open mainly to male any operation on file. it is build-in with express
 import fs from "fs";
 
@@ -10,8 +10,11 @@ cloudinary.config({
 
 const uploadOnCloudinary = async (localFilePath) => {
   try {
-    if (!localPath) return null;
+    if (!localFilePath) {
+      return null;
+    }
     // upload on cloudinary
+
     const response = await cloudinary.uploader.upload(localFilePath, {
       resource_type: "auto",
     });
@@ -20,10 +23,14 @@ const uploadOnCloudinary = async (localFilePath) => {
       "file successfully uploaded on cloudinary: RESPONSE: ",
       response.url
     );
+    fs.unlinkSync(localFilePath);
+
     return response;
     //some task to be done
   } catch (error) {
     // remove the locally stored temporary file as the upload operation got failed
+    console.log(error);
+
     fs.unlinkSync(localFilePath);
     return null;
   }

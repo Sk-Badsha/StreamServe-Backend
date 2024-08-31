@@ -13,28 +13,40 @@ const registerUser = asyncHandler(async (req, res) => {
   }
   if (!email.includes("@")) throw new ApiError(400, "Email is not valid");
 
-  const existedUser = User.findOne({
+  const existedUser = await User.findOne({
     $or: [{ email }, { username }],
   });
 
   if (existedUser)
     throw new ApiError(404, "User with email/username already exists");
 
-  const avatarLocalPath = req.files?.avatar?.path;
-  const coverImageLocalPath = req.files?.coverImage?.path;
+  const avatarLocalPath = req.files?.avatar[0]?.path;
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  }
 
-  if (!avatarLocalPath) throw new ApiError(400, "Avatar is required");
+  if (!avatarLocalPath) throw new ApiError(400, `Avatar  is required`);
+  //   console.log("avtarlocalfilepath", avatarLocalPath);
 
   const avatar = await uploadOnCloudinary(avatarLocalPath);
+  //   console.log("avatar", avatar);
+
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
-  if (!avatar) throw new ApiError(400, "Avatar is required");
+  if (!avatar) {
+    throw new ApiError(500, "Avatar local path is required");
+  }
 
   const user = await User.create({
     fullName,
     avatar: avatar.url,
     username: username.toLowerCase(),
-    email,
+    email: email.toLowerCase(),
     coverImage: coverImage?.url || "",
     password,
   });
