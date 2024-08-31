@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user_schema.js";
 import { uploadOnCloudinary } from "../utils/FileUpload.js";
+
 const registerUser = asyncHandler(async (req, res) => {
   // get user data from frontend
   const { username, email, fullName, password } = req.body;
@@ -63,4 +64,72 @@ const registerUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, createdUser, "user registered successfully"));
 });
 
-export { registerUser };
+const loginUser = asyncHandler(async (req, res) => {
+  // take user data
+  // find if user exist with that info
+  // find the password and decrypt the password and compare
+  // generate access & refresh token
+  // give that to the user and also save it
+  // send response
+
+  const { email, username, password } = req.body;
+  if (!username && !email)
+    throw new ApiError(400, "username or email is required");
+
+  const user = await User.findOne({
+    $or: [{ email }, { username }],
+  });
+
+  if (!user) throw new ApiError(404, "user doesn't exist");
+
+  const isPasswordCorrect = await user.isPasswordCorrect(password);
+
+  if (!isPasswordCorrect) throw new ApiError(401, "Invalid user credentials");
+
+  const { acc_token, ref_token } = await generateAccessAndRefreshToken(
+    user._id
+  );
+
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", acc_token, options)
+    .cookie("refreshToken", ref_token, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          acc_token,
+          ref_token,
+        },
+        "user logged in successfully"
+      )
+    );
+});
+
+const generateAccessAndRefreshToken = async (userId) => {
+  try {
+  } catch (error) {
+    const user = await User.findById(userId);
+    const acc_token = user.generateAccessToken();
+    const ref_token = user.generateRefreshToken();
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+    return { acc_token, ref_token };
+    throw new ApiError(
+      500,
+      "Something went wrong while generating access token"
+    );
+  }
+};
+
+export { registerUser, loginUser };
