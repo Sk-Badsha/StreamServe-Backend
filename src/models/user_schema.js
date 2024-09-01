@@ -9,6 +9,15 @@ const avatarSchema = new mongoose.Schema({
     type: String,
   },
 });
+
+const coverImageSchema = new mongoose.Schema({
+  coverImage_url: {
+    type: String,
+  },
+  coverImage_id: {
+    type: String,
+  },
+});
 const userSchema = new mongoose.Schema(
   {
     username: {
@@ -37,7 +46,7 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
     coverImage: {
-      type: String, // cloudinary url
+      type: coverImageSchema, // cloudinary url
     },
     watchHistory: {
       type: [

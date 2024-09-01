@@ -45,7 +45,7 @@ const destroyOnCloudinary = async (publicID) => {
       "file successfully destroyed on cloudinary: RESPONSE: ",
       response
     );
-    return;
+    return response;
   } catch (error) {
     console.log(error);
     return null;

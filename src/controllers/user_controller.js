@@ -74,7 +74,10 @@ const registerUser = asyncHandler(async (req, res) => {
 
     username: username.toLowerCase(),
     email: email.toLowerCase(),
-    coverImage: coverImage?.url || "",
+    coverImage: {
+      coverImage_url: coverImage?.url || "",
+      coverImage_id: coverImage?.public_id || "",
+    },
     password,
   });
 
@@ -260,7 +263,6 @@ const updateUserDetails = asyncHandler(async (req, res) => {
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
   const avatarLocalPath = req.file?.path;
-  //   console.log("req.user", req.file);
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar file is missing");
   }
@@ -295,27 +297,61 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   if (!coverImageLocalPath) {
     throw new ApiError(400, "Cover Image file is missing");
   }
-  let user = await User.findById(req.user?._id);
-  if (!user) throw new ApiError(404, "user login required");
 
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
   if (!coverImage.url) {
     throw new ApiError(501, "Failed to upload on cloudinary");
   }
 
-  user = User.findByIdAndUpdate(
-    user._id,
+  const user = User.findByIdAndUpdate(
+    req.user?._id,
     {
       $set: {
-        coverImage: coverImage.url,
+        coverImage: {
+          coverImage_url: coverImage.url,
+          coverImage_id: coverImage.public_id,
+        },
       },
     },
     {
       new: true,
     }
   ).select("-password");
+  //   console.log(req.user);
 
-  res.status(200, user, "cover image updated successfully");
+  await destroyOnCloudinary(req.user.coverImage.coverImage_id);
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, user, "Cover Image updated successfully"));
+});
+
+const deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findByIdAndDelete(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined, // this removes the field from document
+      },
+    },
+    {
+      new: true,
+    }
+  );
+
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+  console.log("user on delete: ", user);
+  await destroyOnCloudinary(req.user.avatar.avatar_id);
+  await destroyOnCloudinary(req.user.coverImage.coverImage_id);
+
+  return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User deleted successfully"));
 });
 
 export {
@@ -328,4 +364,5 @@ export {
   updateUserDetails,
   updateUserAvatar,
   updateUserCoverImage,
+  deleteUser,
 };
