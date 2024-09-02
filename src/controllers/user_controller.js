@@ -28,6 +28,7 @@ const generateAccessAndRefreshToken = async (userId) => {
 
 const registerUser = asyncHandler(async (req, res) => {
   // get user data from frontend
+
   const { username, email, fullName, password } = req.body;
   if (
     [username, email, fullName, password].some((field) => field?.trim() === "")
@@ -87,6 +88,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   if (!createdUser)
     throw new ApiError(500, "Something went wrong while registering user");
+  console.log("user in register", createdUser);
 
   return res
     .status(201)
@@ -271,6 +273,8 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     throw new ApiError(501, "Failed to upload on cloudinary");
   }
 
+  const Previous_avatar_id = req.user.avatar.avatar_id;
+
   const user = await User.findByIdAndUpdate(
     req.user._id,
     {
@@ -285,7 +289,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
       new: true,
     }
   ).select("-password");
-  await destroyOnCloudinary(req.user.avatar.avatar_id);
+  await destroyOnCloudinary(Previous_avatar_id);
 
   res
     .status(200)
@@ -293,65 +297,73 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 });
 
 const updateUserCoverImage = asyncHandler(async (req, res) => {
-  const coverImageLocalPath = req.file?.path;
-  if (!coverImageLocalPath) {
-    throw new ApiError(400, "Cover Image file is missing");
-  }
+  try {
+    const coverImageLocalPath = req.file?.path;
+    if (!coverImageLocalPath) {
+      throw new ApiError(400, "Cover Image file is missing");
+    }
 
-  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
-  if (!coverImage.url) {
-    throw new ApiError(501, "Failed to upload on cloudinary");
-  }
+    const new_coverImage = await uploadOnCloudinary(coverImageLocalPath);
+    if (!new_coverImage.url) {
+      throw new ApiError(501, "Failed to upload on cloudinary");
+    }
 
-  const user = User.findByIdAndUpdate(
-    req.user?._id,
-    {
-      $set: {
-        coverImage: {
-          coverImage_url: coverImage.url,
-          coverImage_id: coverImage.public_id,
+    const previous_coverImage_id = req.user.coverImage.coverImage_id;
+
+    const user = await User.findByIdAndUpdate(
+      req.user?._id,
+      {
+        $set: {
+          coverImage: {
+            coverImage_url: new_coverImage.url,
+            coverImage_id: new_coverImage.public_id,
+          },
         },
       },
-    },
-    {
-      new: true,
-    }
-  ).select("-password");
-  //   console.log(req.user);
+      {
+        new: true,
+      }
+    ).select("-password");
 
-  await destroyOnCloudinary(req.user.coverImage.coverImage_id);
-
-  res
-    .status(200)
-    .json(new ApiResponse(200, user, "Cover Image updated successfully"));
+    await destroyOnCloudinary(previous_coverImage_id);
+    console.log("user", req.user);
+    res
+      .status(200)
+      .json(new ApiResponse(200, user, "Cover Image updated successfully"));
+  } catch (error) {
+    throw new ApiError(400, error.message);
+  }
 });
 
 const deleteUser = asyncHandler(async (req, res) => {
-  const user = await User.findByIdAndDelete(
-    req.user._id,
-    {
-      $set: {
-        refreshToken: undefined, // this removes the field from document
-      },
-    },
-    {
-      new: true,
-    }
-  );
+  // First, destroy the avatar and cover image if they exist
+  if (req.user?.avatar?.avatar_id) {
+    await destroyOnCloudinary(req.user.avatar.avatar_id);
+  }
 
-  const options = {
-    httpOnly: true,
-    secure: true,
-  };
-  console.log("user on delete: ", user);
-  await destroyOnCloudinary(req.user.avatar.avatar_id);
-  await destroyOnCloudinary(req.user.coverImage.coverImage_id);
+  if (req.user?.coverImage?.coverImage_id) {
+    await destroyOnCloudinary(req.user.coverImage.coverImage_id);
+  }
 
-  return res
-    .status(200)
-    .clearCookie("accessToken", options)
-    .clearCookie("refreshToken", options)
-    .json(new ApiResponse(200, {}, "User deleted successfully"));
+  // Now, delete the user from the database
+  const user = await User.findByIdAndDelete(req.user._id);
+
+  if (user) {
+    const options = {
+      httpOnly: true,
+      secure: true,
+    };
+
+    console.log("User deleted: ", user);
+
+    return res
+      .status(200)
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .json(new ApiResponse(200, {}, "User deleted successfully"));
+  } else {
+    return res.status(404).json(new ApiResponse(404, {}, "User not found"));
+  }
 });
 
 export {
